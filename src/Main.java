@@ -18,6 +18,7 @@
     - Abrufen von Bewertungen der Restaurants im Umkreis
         - Balken in der app der grün nach rechts wächst, wenn restaurant gut
         - Balken in der app, der rot nach links wächst, wenn restaurant schlecht
+    - gittest
 */
 
 public class Main {
