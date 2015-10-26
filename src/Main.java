@@ -24,6 +24,7 @@
 public class Main {
 
     public static void main(String[] args) {
-        System.out.println("Hello World!");
+        boolean fag = false;
+        System.out.println(fag? "FAG!" : "No fag!");
     }
 }
