@@ -26,5 +26,6 @@ public class Main {
     public static void main(String[] args) {
         boolean fag = false;
         System.out.println(fag? "FAG!" : "No fag!");
+        System.out.println("Lappen!");
     }
 }
