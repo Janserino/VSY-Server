@@ -1,1 +1,22 @@
-{"restaurantListe":[{"anzahl":0,"name":"McDonalds","id":1452177700266,"bewertung":0}]}
+{
+  "restaurantListe": [
+    {
+      "anzahl": 0,
+      "name": "McDonalds",
+      "id": 1452177700266,
+      "bewertung": 0
+    },
+    {
+      "anzahl": 0,
+      "name": "BK",
+      "id": 1452265692972,
+      "bewertung": 0
+    },
+    {
+      "anzahl": 0,
+      "name": "Döner",
+      "id": 1452265702808,
+      "bewertung": 0
+    }
+  ]
+}

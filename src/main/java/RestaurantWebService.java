@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.net.ConnectException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,16 +23,21 @@ import org.json.simple.parser.ParseException;
 
 public class RestaurantWebService extends NanoHTTPD {
 
+    //region ## Globale Variablen ##
+    private static final boolean debug = true;
+
     private static final JSONParser JSON_PARSER = new JSONParser();
 
     private static final int PORT = 8081;
 
     private static final String CREATE_RESTAURANT = "createRestaurant",
-                                GET_RESTAURANT = "getRestaurant",
-                                POST_RESTAURANT = "postRestaurant";
+            GET_RESTAURANT = "getRestaurant",
+            POST_RESTAURANT = "postRestaurant",
+            OTHER_SERVER = "127.0.0.1:8082/";
 
     private Object token = new Object();
 
+    //endregion
 
     public RestaurantWebService() throws IOException {
         super(PORT);
@@ -49,23 +55,25 @@ public class RestaurantWebService extends NanoHTTPD {
 
     @Override
     public Response serve(IHTTPSession session) {
-        //Auslesen Kommandos aus URI
-        String uri = session.getUri().trim();
-        uri = uri.substring(1, uri.length());
+        //Lese Methode aus URI
+        String uri = session.getUri().substring(1, session.getUri().length()).trim();
 
-        System.out.println(uri);
+        if (debug)
+            System.out.println(uri);
 
-        String restaurantName = "";
+        String restaurantName = null;
+        long restaurantId = 0;
+        short restaurantBewertung = 0;
+        Map<String, String> files = new HashMap<>(), parameter = session.getParms();
 
-
-        Map<String, String> files = new HashMap<>(), parms = session.getParms();
-
-        JSONObject jsonData = null;
-        //noinspection EmptyCatchBlock
         try {
             session.parseBody(files);
-            if(parms.get("name") != null)
-                restaurantName = parms.get("name");
+            if (parameter.get("name") != null)
+                restaurantName = parameter.get("name");
+            if (parameter.get("id") != null)
+                restaurantId = Long.parseLong(parameter.get("id"));
+            if (parameter.get("bewertung") != null)
+                restaurantBewertung = Short.parseShort(parameter.get("bewertung"));
         } catch (StringIndexOutOfBoundsException e) {
             return error(21, e.getMessage());
         } catch (IOException e) {
@@ -74,18 +82,38 @@ public class RestaurantWebService extends NanoHTTPD {
             return error(41, e.getMessage());
         }
 
+
         switch (uri) {
             case CREATE_RESTAURANT:
+                sendRequstToOtherServer(restaurantName);
                 return addRestaurant(restaurantName);
             case POST_RESTAURANT:
-
-                break;
+                sendRequstToOtherServer(restaurantId, restaurantBewertung);
+                return rateRestaurant(restaurantId, restaurantBewertung);
             case GET_RESTAURANT:
                 return newFixedLengthResponse(readRestaurants().toJSONString());
             default:
                 return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Fehler Ressource nicht gefunden");
         }
-        return newFixedLengthResponse("Test" + "</body></html>\n");
+    }
+
+    private Response rateRestaurant(long restaurantId, short restaurantBewertung) {
+        JSONArray restaurants = readRestaurants();
+        Restaurant restaurant = new Restaurant();
+        int i = 0;
+        for (; i < restaurants.size(); i++) {
+            JSONObject restaurantJSON = (JSONObject) restaurants.get(i);
+            long id = Long.parseLong(restaurantJSON.get("id").toString());
+            if (id == restaurantId)
+                restaurant = Restaurant.parseJSON(restaurantJSON);
+            break;
+        }
+
+        restaurant.bewertung = ((restaurant.anzahl * restaurant.bewertung) + restaurantBewertung) / ++restaurant.anzahl;
+        restaurants.set(i, restaurant.toJSON());
+        writeRestaurants(restaurants);
+
+        return newFixedLengthResponse(restaurants.toJSONString());
     }
 
     private Response addRestaurant(String name) {
@@ -153,6 +181,26 @@ public class RestaurantWebService extends NanoHTTPD {
         return new JSONArray();
     }
 
+    private void sendRequstToOtherServer(long restaurantId, short restaurantBewertung) {
+        try {
+            //TODO: Verbindung aufbauen und Request versenden
+        } catch (Exception e) {
+            //catch (ConnectException e){
+            //TODO: Falls ein Problem auftritt muss der Request in eine Liste geschrieben werden
+            //TODO: diese Liste muss dann bei wiedererreichbarkeit des Servers abgearbeitet werden
+        }
+    }
+
+    private void sendRequstToOtherServer(String restaurantName) {
+        try {
+            //TODO: Verbindung aufbauen und Request versenden
+        } catch (Exception e) {
+            //catch (ConnectException e){
+            //TODO: Falls ein Problem auftritt muss der Request in eine Liste geschrieben werden
+            //TODO: diese Liste muss dann bei wiedererreichbarkeit des Servers abgearbeitet werden
+        }
+    }
+
     private Response error(int code, String text) {
         System.out.println(text);
 
@@ -168,5 +216,4 @@ public class RestaurantWebService extends NanoHTTPD {
 
         return newFixedLengthResponse(response.toJSONString());
     }
-
 }
