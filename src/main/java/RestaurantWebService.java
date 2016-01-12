@@ -31,7 +31,7 @@ public class RestaurantWebService extends NanoHTTPD {
     private static final int PORT = 8081;
 
     private static final String CREATE_RESTAURANT = "createRestaurant",
-            GET_RESTAURANT = "getRestaurant",
+            GET_RESTAURANT = "getRestaurants",
             POST_RESTAURANT = "postRestaurant",
             OTHER_SERVER = "127.0.0.1:8082/";
 
