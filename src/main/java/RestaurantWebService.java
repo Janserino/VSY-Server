@@ -6,12 +6,11 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.Writer;
-import java.net.ConnectException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import fi.iki.elonen.NanoHTTPD;
 
@@ -29,13 +28,19 @@ public class RestaurantWebService extends NanoHTTPD {
     private static final JSONParser JSON_PARSER = new JSONParser();
 
     private static final int PORT = 8081;
+    private static final String FILENAME = "restaurantList.json";
 
-    private static final String CREATE_RESTAURANT = "createRestaurant",
+    public static final String CREATE_RESTAURANT = "createRestaurant",
             GET_RESTAURANT = "getRestaurant",
             POST_RESTAURANT = "postRestaurant",
+            COPY_RESTAURANT = "copyRestaurant",
+            SERVER_UP_MSG = "imHere",
             OTHER_SERVER = "127.0.0.1:8082/";
 
     private Object token = new Object();
+
+    public static boolean backupServerUp = false;
+    private static List<JSONObject> failedRequestList = new ArrayList<>();
 
     //endregion
 
@@ -43,6 +48,25 @@ public class RestaurantWebService extends NanoHTTPD {
         super(PORT);
         start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
         System.out.println("\nRunning! Point your browers to http://localhost:" + PORT + "/ \n");
+
+        //Send Online to other Server
+//        ConnectionHandler.isAvailable();
+        new Thread() {
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        ConnectionHandler.isAvailable();
+                        backupServerUp = true;
+                        Thread.sleep(1000);
+                    } catch (IOException e) {
+                        backupServerUp = false;
+                    } catch (InterruptedException e) {
+                        backupServerUp = false;
+                    }
+                }
+            }
+        }.start();
     }
 
     public static void main(String[] args) {
@@ -58,46 +82,61 @@ public class RestaurantWebService extends NanoHTTPD {
         //Lese Methode aus URI
         String uri = session.getUri().substring(1, session.getUri().length()).trim();
 
-        if (debug)
+        if (debug && !uri.startsWith("i"))
             System.out.println(uri);
 
-        String restaurantName = null;
-        long restaurantId = 0;
-        short restaurantBewertung = 0;
-        Map<String, String> files = new HashMap<>(), parameter = session.getParms();
+
+        Map<String, String> files = new HashMap<>();
+        session.getParms();
+        StringBuilder params = new StringBuilder();
+        Restaurant rest = new Restaurant();
 
         try {
             session.parseBody(files);
-            if (parameter.get("name") != null)
-                restaurantName = parameter.get("name");
-            if (parameter.get("id") != null)
-                restaurantId = Long.parseLong(parameter.get("id"));
-            if (parameter.get("bewertung") != null)
-                restaurantBewertung = Short.parseShort(parameter.get("bewertung"));
+            params.append(files);
+            if (params.length() > 10) {
+                params.delete(0, 10);
+                params.delete(params.length() - 1, params.length());
+                rest = Restaurant.parseJSON(((JSONObject) JSON_PARSER.parse(params.toString())));
+            }
+
+//            if (parameter.get("name") != null)
+//                restaurantName = parameter.get("name");
+//            if (parameter.get("id") != null)
+//                restaurantId = Long.parseLong(parameter.get("id"));
+//            if (parameter.get("bewertung") != null)
+//                restaurantBewertung = Short.parseShort(parameter.get("bewertung"));
+//            if (parameter.get("anzahl") != null)
+//                anzahl = Integer.parseInt(parameter.get("anzahl"));
         } catch (StringIndexOutOfBoundsException e) {
             return error(21, e.getMessage());
         } catch (IOException e) {
             return error(31, e.getMessage());
         } catch (ResponseException e) {
             return error(41, e.getMessage());
+        } catch (ParseException e) {
+            return error(51, e.getMessage());
         }
 
 
         switch (uri) {
             case CREATE_RESTAURANT:
-                sendRequstToOtherServer(restaurantName);
-                return addRestaurant(restaurantName);
+                return addRestaurant(rest.name);
             case POST_RESTAURANT:
-                sendRequstToOtherServer(restaurantId, restaurantBewertung);
-                return rateRestaurant(restaurantId, restaurantBewertung);
+                return rateRestaurant(rest.id, rest.bewertung);
             case GET_RESTAURANT:
                 return newFixedLengthResponse(readRestaurants().toJSONString());
+            case COPY_RESTAURANT:
+                otherServerUp();
+                return addRestaurant(rest.id, rest.name, rest.bewertung, rest.anzahl);
+            case SERVER_UP_MSG:
+                return otherServerUp();
             default:
                 return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Fehler Ressource nicht gefunden");
         }
     }
 
-    private Response rateRestaurant(long restaurantId, short restaurantBewertung) {
+    private Response rateRestaurant(long restaurantId, double restaurantBewertung) {
         JSONArray restaurants = readRestaurants();
         Restaurant restaurant = new Restaurant();
         int i = 0;
@@ -113,6 +152,7 @@ public class RestaurantWebService extends NanoHTTPD {
         restaurants.set(i, restaurant.toJSON());
         writeRestaurants(restaurants);
 
+        sendRequstToOtherServer(restaurant.toJSON());
         return newFixedLengthResponse(restaurants.toJSONString());
     }
 
@@ -122,10 +162,14 @@ public class RestaurantWebService extends NanoHTTPD {
         JSONArray restaurants = readRestaurants();
 
         //Eintrag hinzufügen
-        restaurants.add(createNewRestaurant(name));
+        JSONObject newRestaurant = createNewRestaurant(name);
+        restaurants.add(newRestaurant);
 
         //Datei speichern
         writeRestaurants(restaurants);
+
+        //An anderen Server senden
+        sendRequstToOtherServer(newRestaurant);
 
         return newFixedLengthResponse(restaurants.toJSONString());
     }
@@ -140,12 +184,47 @@ public class RestaurantWebService extends NanoHTTPD {
         return restaurant;
     }
 
+    private Response addRestaurant(long restaurantId, String name, double restaurantBewertung, int anzahl) {
+
+        //Einträge lesen
+        JSONArray restaurants = readRestaurants();
+
+        boolean replaced = false;
+
+        Restaurant restaurant = new Restaurant();
+        restaurant.bewertung = restaurantBewertung;
+        restaurant.anzahl = anzahl;
+        restaurant.name = name;
+        restaurant.id = restaurantId;
+
+        //Eintrag prüfen
+        for (int i = 0; i < restaurants.size(); i++) {
+            JSONObject restaurantJSON = (JSONObject) restaurants.get(i);
+            long id = Long.parseLong(restaurantJSON.get("id").toString());
+            if (id == restaurantId) {
+                //Falls Eintrag vorhanden, diesen ersetzen
+                restaurants.set(i, restaurant.toJSON());
+                replaced = true;
+                break;
+            }
+        }
+
+        if (!replaced)
+            restaurants.add(restaurant.toJSON());
+
+        //Datei speichern
+        writeRestaurants(restaurants);
+
+        //An anderen Server senden
+        return newFixedLengthResponse(restaurants.toJSONString());
+    }
+
     private void writeRestaurants(JSONArray restaurants) {
         try {
             JSONObject jsonObject = new JSONObject();
             jsonObject.put("restaurantListe", restaurants);
             synchronized (token) {
-                PrintWriter printWriter = new PrintWriter("restaurants.json");
+                PrintWriter printWriter = new PrintWriter(FILENAME);
                 printWriter.print(jsonObject.toJSONString());
                 printWriter.close();
             }
@@ -158,7 +237,7 @@ public class RestaurantWebService extends NanoHTTPD {
         try {
             synchronized (token) {
                 //Lesen der Liste Restaurants
-                BufferedReader input = new BufferedReader(new FileReader("restaurants.json"));
+                BufferedReader input = new BufferedReader(new FileReader(FILENAME));
                 StringBuilder stringBuilder = new StringBuilder();
 
                 String line;
@@ -181,24 +260,31 @@ public class RestaurantWebService extends NanoHTTPD {
         return new JSONArray();
     }
 
-    private void sendRequstToOtherServer(long restaurantId, short restaurantBewertung) {
+    private boolean sendRequstToOtherServer(JSONObject jsonObject) {
         try {
-            //TODO: Verbindung aufbauen und Request versenden
-        } catch (Exception e) {
-            //catch (ConnectException e){
-            //TODO: Falls ein Problem auftritt muss der Request in eine Liste geschrieben werden
-            //TODO: diese Liste muss dann bei wiedererreichbarkeit des Servers abgearbeitet werden
+            if (backupServerUp) {
+                ConnectionHandler.copyRestaurant(jsonObject);
+                return true;
+            } else
+                throw new IOException();
+        } catch (IOException e) {
+            //TODO: Test
+            if (!failedRequestList.contains(jsonObject))
+                failedRequestList.add(jsonObject);
+            return false;
         }
     }
 
-    private void sendRequstToOtherServer(String restaurantName) {
-        try {
-            //TODO: Verbindung aufbauen und Request versenden
-        } catch (Exception e) {
-            //catch (ConnectException e){
-            //TODO: Falls ein Problem auftritt muss der Request in eine Liste geschrieben werden
-            //TODO: diese Liste muss dann bei wiedererreichbarkeit des Servers abgearbeitet werden
+    private Response otherServerUp() {
+        for (JSONObject object : failedRequestList) {
+            if (sendRequstToOtherServer(object))
+                failedRequestList.remove(object);
+            else {
+                backupServerUp = false;
+                break;
+            }
         }
+        return newFixedLengthResponse(Response.Status.OK, MIME_PLAINTEXT, "OK");
     }
 
     private Response error(int code, String text) {

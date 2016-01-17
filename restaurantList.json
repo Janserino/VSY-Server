@@ -1,0 +1,76 @@
+{
+  "restaurantListe": [
+    {
+      "anzahl": 0,
+      "name": null,
+      "id": 0,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest123",
+      "id": 1452788251647,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest1234",
+      "id": 1452788413591,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest12345",
+      "id": 1452788418166,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest123456",
+      "id": 1452788422765,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest123456",
+      "id": 1452788437022,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest123456",
+      "id": 1452788437581,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest123456",
+      "id": 1452788438060,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest123456",
+      "id": 1452788438509,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest1234567",
+      "id": 1452788501168,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest12345678",
+      "id": 1452788506414,
+      "bewertung": 0.0
+    },
+    {
+      "anzahl": 0,
+      "name": "TestTest12345679",
+      "id": 1452788537576,
+      "bewertung": 0.0
+    }
+  ]
+}
