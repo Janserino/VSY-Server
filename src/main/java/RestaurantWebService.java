@@ -6,6 +6,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -24,6 +25,8 @@ public class RestaurantWebService extends NanoHTTPD {
 
     //region ## Globale Variablen ##
     private static final boolean debug = true;
+    private boolean statusChange = false;
+    private String timeStamp = "";
 
     private static final JSONParser JSON_PARSER = new JSONParser();
 
@@ -35,7 +38,7 @@ public class RestaurantWebService extends NanoHTTPD {
             POST_RESTAURANT = "postRestaurant",
             COPY_RESTAURANT = "copyRestaurant",
             SERVER_UP_MSG = "imHere",
-            OTHER_SERVER = "192.168.2.111:8081/";
+            OTHER_SERVER = "192.168.178.30:8083/";
 
     private Object token = new Object();
 
@@ -54,15 +57,27 @@ public class RestaurantWebService extends NanoHTTPD {
         new Thread() {
             @Override
             public void run() {
+                String timeStamp = "";
                 while (true) {
                     try {
                         ConnectionHandler.isAvailable();
                         backupServerUp = true;
                         Thread.sleep(1000);
+                        statusChange = true;
                     } catch (IOException e) {
                         backupServerUp = false;
+                        if (statusChange) {
+                            timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+                            System.out.println(timeStamp + " The other Server just have gone down");
+                        }
+                        statusChange = false;
                     } catch (InterruptedException e) {
                         backupServerUp = false;
+                        if (statusChange) {
+                            timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+                            System.out.println(timeStamp + " The other Server just have gone down");
+                        }
+                        statusChange = false;
                     }
                 }
             }
@@ -82,8 +97,13 @@ public class RestaurantWebService extends NanoHTTPD {
         //Lese Methode aus URI
         String uri = session.getUri().substring(1, session.getUri().length()).trim();
 
-        if (debug)
-            System.out.println(uri);
+        if (debug) {
+            if (!statusChange) {
+                timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+                System.out.println(timeStamp +" "+ uri);
+            }
+            statusChange = true;
+        }
 
         session.getParms();
         Map<String, String> files = new HashMap<>();
