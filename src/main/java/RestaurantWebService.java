@@ -19,6 +19,7 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import sun.rmi.runtime.Log;
 
 
 public class RestaurantWebService extends NanoHTTPD {
@@ -280,7 +281,6 @@ public class RestaurantWebService extends NanoHTTPD {
             } else
                 throw new IOException();
         } catch (IOException e) {
-            //TODO: Test
             if (!failedRequestList.contains(jsonObject))
                 failedRequestList.add(jsonObject);
             return false;
@@ -289,8 +289,11 @@ public class RestaurantWebService extends NanoHTTPD {
 
     private Response otherServerUp() {
         for (JSONObject object : failedRequestList) {
-            if (sendRequestToOtherServer(object))
+            if (sendRequestToOtherServer(object)) {
+                timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+                System.out.println(timeStamp + " The other Server is up again, Listrequest left: " + failedRequestList.size());
                 failedRequestList.remove(object);
+            }
             else {
                 backupServerUp = false;
                 break;
